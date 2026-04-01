@@ -1,0 +1,150 @@
+# -*- coding: utf-8 -*-
+"""
+AI 摘要 - 豆包对每个分类的文章进行筛选、核验时间、压缩摘要
+"""
+
+import os
+import json
+import logging
+import requests
+from datetime import datetime, timedelta
+from typing import List, Dict
+
+logger = logging.getLogger(__name__)
+
+DOUBAO_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3/chat/completions"
+DOUBAO_API_KEY  = os.environ.get("DOUBAO_API_KEY", "")
+DOUBAO_MODEL    = os.environ.get("DOUBAO_MODEL", "")
+
+
+def _parse_json(text: str):
+    text = text.strip()
+    if "```" in text:
+        for p in text.split("```"):
+            t = p[4:] if p.startswith("json") else p
+            if "{" in t or "[" in t:
+                text = t
+                break
+    start = min((text.find("{") if "{" in text else 9999),
+                (text.find("[") if "[" in text else 9999))
+    end   = max(text.rfind("}"), text.rfind("]")) + 1
+    if start < end:
+        text = text[start:end]
+    return json.loads(text.strip())
+
+
+def _chat(messages: list, max_tokens: int = 3000, temperature: float = 0.2) -> str:
+    resp = requests.post(
+        DOUBAO_BASE_URL,
+        headers={"Authorization": f"Bearer {DOUBAO_API_KEY}",
+                 "Content-Type": "application/json"},
+        json={"model": DOUBAO_MODEL, "messages": messages,
+              "max_tokens": max_tokens, "temperature": temperature},
+        timeout=300,
+    )
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"].strip()
+
+
+def summarize_category(cat: Dict, articles: List[Dict], today: str, yesterday: str) -> List[Dict]:
+    if not articles:
+        return []
+
+    news_text = ""
+    for i, a in enumerate(articles):
+        news_text += (
+            f"[{i}] 原始时间字段：「{a['raw_date']}」| 来源：{a['source']}\n"
+            f"    标题：{a['title']}\n"
+            f"    链接：{a['link']}\n"
+            f"    摘要：{a['summary'][:150]}\n\n"
+        )
+
+    prompt = f"""今天是 {today}，昨天是 {yesterday}。
+
+你是 AI 行业编辑，正在整理【{cat['name']}】分类的昨日新闻。
+
+以下是候选文章（共 {len(articles)} 条），每条都有"原始时间字段"：
+
+{news_text}
+
+=== 第一步：严格时间核验 ===
+
+对每条文章的"原始时间字段"逐一判断，规则如下：
+
+相对时间（如"X小时前"、"X hours ago"）：
+- 今天是 {today}，以此推算：
+- 24小时以内 = 今天或昨天，保留
+- 超过24小时 = 丢弃
+
+中文相对时间（如"X天前"、"X分钟前"）：
+- "X分钟前"、"X小时前" = 保留
+- "1天前" = 昨天，保留
+- "2天前"及以上 = 丢弃
+
+绝对日期（如 2026/03/20、Mar 20, 2026）：
+- 只保留日期等于昨天 {yesterday} 的
+- 其他日期一律丢弃
+
+时间字段为空或无法判断：丢弃，不要猜测
+
+=== 第二步：筛选整理 ===
+
+从通过时间核验的文章里，选出最值得关注的 3-5 条。
+内容高度重复的合并成一条。
+
+=== 第三步：每条输出 ===
+
+- headline：重写标题，20字以内，主语+事件，简洁有力
+- digest：120字左右的摘要（不能少于100字，不能超过140字），要写清楚：
+  1. 具体发生了什么（谁、做了什么、关键数据）
+  2. 为什么重要或有什么影响
+  3. 背景补充（如果有）
+  注意：120字是硬性要求，宁可多写细节也不要凑字数
+- importance：重要/关注/一般
+- source：来源媒体名
+- link：从文章的"链接："字段原样复制，一字不改
+- tags：2-4个关键词，逗号分隔
+
+只输出 JSON，不要其他文字：
+{{
+  "items": [
+    {{
+      "headline": "标题",
+      "digest": "120字左右的摘要",
+      "importance": "重要/关注/一般",
+      "source": "来源",
+      "link": "原始链接原样复制",
+      "tags": "标签1,标签2"
+    }}
+  ]
+}}
+
+如果没有通过时间核验的文章，输出：{{"items": []}}"""
+
+    for attempt in range(3):  # 最多重试3次
+        try:
+            raw    = _chat([{"role": "user", "content": prompt}], max_tokens=3000)
+            parsed = _parse_json(raw)
+            items  = parsed.get("items", [])
+            logger.info("  [%s] 保留 %d 条（原 %d 条）", cat["name"], len(items), len(articles))
+            return items
+        except Exception as e:
+            logger.warning("  [%s] 第%d次失败: %s", cat["name"], attempt+1, e)
+            if attempt < 2:
+                import time; time.sleep(10)
+    logger.error("  [%s] 3次重试均失败，跳过", cat["name"])
+    return []
+
+
+def summarize_all(categories: List[Dict], raw_news: Dict[str, List[Dict]]) -> Dict[str, List[Dict]]:
+    today     = datetime.now().strftime("%Y年%m月%d日")
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y年%m月%d日")
+
+    result = {}
+    for cat in categories:
+        cat_id   = cat["id"]
+        articles = raw_news.get(cat_id, [])
+        logger.info("豆包处理: [%s] %d 条候选", cat["name"], len(articles))
+        result[cat_id] = summarize_category(cat, articles, today, yesterday)
+
+    return result
