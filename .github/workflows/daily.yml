@@ -11,10 +11,10 @@ jobs:
 
     steps:
       - name: 检出代码
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: 安装 Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -23,7 +23,7 @@ jobs:
 
       - name: 创建 .env 文件
         run: |
-          cat > .env << EOF
+          cat > .env << 'EOF'
           DOUBAO_API_KEY=${{ secrets.DOUBAO_API_KEY }}
           DOUBAO_MODEL=${{ secrets.DOUBAO_MODEL }}
           SERPER_API_KEY=${{ secrets.SERPER_API_KEY }}
@@ -38,10 +38,10 @@ jobs:
       - name: 运行日报
         run: python main.py
 
-      - name: 上传 HTML 产物（可选，方便查看）
-        uses: actions/upload-artifact@v5
+      - name: 上传 HTML 产物
+        uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: daily-report
+          name: daily-report-${{ github.run_id }}
           path: output/*.html
           retention-days: 7
