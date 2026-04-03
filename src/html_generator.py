@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-HTML 生成器 - 把处理好的新闻生成日报 HTML
+HTML 生成器 - 多行业通用版
 """
 
 import os
@@ -18,8 +18,7 @@ IMPORTANCE_MAP = {
     "一般": ("tag-low",  "一般"),
 }
 
-# 提示词模板，{title} {digest} {source} {tags} {today} 会被替换
-PROMPT_TEMPLATE = """你是一位 AI 行业资深研究员，请对以下新闻进行深度分析。
+PROMPT_TEMPLATE = """你是一位行业资深研究员，请对以下新闻进行深度分析。
 
 ━━━━━━━━━━━━━━━━━━━━━━
 【新闻标题】{title}
@@ -68,7 +67,6 @@ def _news_item_html(item: Dict) -> str:
     tags_disp = "".join(f'<span class="detail-tag">{_escape(t.strip())}</span>'
                         for t in tags_raw.split(",") if t.strip())
 
-    # 提示词里用的纯文本（不需要 escape，JS 会处理）
     prompt = PROMPT_TEMPLATE.format(
         title=item.get("headline", ""),
         digest=item.get("digest", ""),
@@ -76,7 +74,6 @@ def _news_item_html(item: Dict) -> str:
         tags=tags_raw.replace(",", "、"),
         today=datetime.now().strftime("%Y-%m-%d"),
     )
-    # 把提示词 JS 转义，存进 data 属性
     prompt_escaped = prompt.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
 
     return f"""
@@ -117,35 +114,46 @@ def _section_html(cat: Dict, items: List[Dict]) -> str:
   </div>"""
 
 
-def generate_html(categories: List[Dict], summarized: Dict[str, List[Dict]]) -> str:
+def generate_html(categories: List[Dict], summarized: Dict[str, List[Dict]],
+                  report_title: str = "AI 行业日报",
+                  profile: str = "ai") -> str:
+    """
+    生成 HTML 日报。
+    report_title: 页面标题，如 "AI 行业日报" / "电池行业日报"
+    profile: 用于文件名前缀区分，如 ai / battery
+    """
     OUTPUT_DIR.mkdir(exist_ok=True)
     today     = datetime.now().strftime("%Y年%m月%d日")
     yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y年%m月%d日")
-    filename  = "AI-Daily-%s.html" % datetime.now().strftime("%Y%m%d")
-    output    = str(OUTPUT_DIR / filename)
+
+    # 文件名带 profile 前缀，避免两个行业互相覆盖
+    prefix   = profile.upper()
+    filename = f"{prefix}-Daily-{datetime.now().strftime('%Y%m%d')}.html"
+    output   = str(OUTPUT_DIR / filename)
 
     total = sum(len(v) for v in summarized.values())
     important = sum(1 for v in summarized.values()
                     for it in v if it.get("importance") == "重要")
 
-    # 导航 tab
     nav_tabs = "\n".join(
         f'  <a class="nav-tab" href="#{c["id"]}">{_escape(c["emoji"])} {_escape(c["name"])}</a>'
         for c in categories if summarized.get(c["id"])
     )
 
-    # 各分类内容
     sections = "\n".join(
         _section_html(c, summarized.get(c["id"], []))
         for c in categories
     )
+
+    # ── logo 文字根据行业变化 ──
+    logo_text = _escape(report_title).replace("日报", "").strip()
 
     html = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI 行业日报 · {yesterday}</title>
+<title>{_escape(report_title)} · {yesterday}</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
   :root {{
@@ -221,7 +229,7 @@ def generate_html(categories: List[Dict], summarized: Dict[str, List[Dict]]) -> 
 
 <div class="header">
   <div class="header-left">
-    <div class="logo">AI DAILY</div>
+    <div class="logo">{_escape(logo_text)} DAILY</div>
     <div class="divider-v"></div>
     <div class="date-label">{today} · 早报</div>
   </div>
@@ -246,7 +254,7 @@ def generate_html(categories: List[Dict], summarized: Dict[str, List[Dict]]) -> 
 {sections}
 </div>
 
-<div class="footer">AI DAILY &middot; {yesterday} &middot; Serper + 豆包 AI &middot; 仅供参考</div>
+<div class="footer">{_escape(logo_text)} DAILY &middot; {yesterday} &middot; Serper + 豆包 AI &middot; 仅供参考</div>
 
 <script>
 function toggle(el) {{ el.closest('.news-item').classList.toggle('open'); }}
@@ -284,7 +292,6 @@ tabs.forEach(t => {{
     document.querySelector(t.getAttribute('href'))?.scrollIntoView({{behavior:'smooth',block:'start'}});
   }});
 }});
-// 默认激活第一个 tab
 if (tabs.length) tabs[0].classList.add('active');
 </script>
 </body>

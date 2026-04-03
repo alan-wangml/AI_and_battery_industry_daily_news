@@ -22,7 +22,6 @@ _DATE_FMTS = ["%b %d, %Y", "%Y-%m-%d", "%d %b %Y", "%Y/%m/%d", "%m/%d/%Y"]
 
 
 def _parse_date(date_str: str):
-    """解析各种日期格式，返回 datetime 或 None"""
     if not date_str:
         return None
     m = re.match(r"(\d+)\s*(hour|day|week|month|小时|天|周|个月|分钟|minute|min)", date_str, re.I)
@@ -52,10 +51,6 @@ def _parse_date(date_str: str):
 
 
 def _is_within_range(date_str: str, max_hours: int = 48) -> bool:
-    """
-    判断 date_str 是否在最近 max_hours 小时以内。
-    解析失败返回 False（宁可误杀，不放过旧闻）。
-    """
     dt = _parse_date(date_str)
     if dt is None:
         return False
@@ -63,19 +58,7 @@ def _is_within_range(date_str: str, max_hours: int = 48) -> bool:
     return dt >= cutoff
 
 
-# ───────── 核心：AI 输出后的代码级日期校验 ─────────
-
 def _validate_dates(items: List[Dict], original_articles: List[Dict], max_hours: int = 48) -> List[Dict]:
-    """
-    拿 AI 返回的每条 item，通过 link 回溯原始文章的 raw_date，
-    用代码硬性校验日期。不在时间范围内的直接丢弃。
-
-    策略：
-      1. link 能匹配到原始文章 → 用原始 raw_date 校验
-      2. link 匹配不到（AI 可能改了链接）→ 用标题模糊匹配兜底
-      3. 完全匹配不到原始文章 → 丢弃（来路不明）
-    """
-    # 建立 link → raw_date 的索引
     link_to_date = {}
     title_to_date = {}
     for art in original_articles:
@@ -92,24 +75,18 @@ def _validate_dates(items: List[Dict], original_articles: List[Dict], max_hours:
         headline   = item.get("headline", "")
         raw_date   = None
 
-        # 方式 1：精确匹配 link
         if item_link in link_to_date:
             raw_date = link_to_date[item_link]
         else:
-            # 方式 2：标题模糊匹配（AI 可能重写了标题，用关键词匹配）
             for orig_title, rd in title_to_date.items():
-                # 简单的子串匹配：headline 的前10个字出现在原标题中
                 if len(headline) >= 4 and headline[:10] in orig_title:
                     raw_date = rd
                     break
-                # 或者原标题的前10个字出现在 headline 中
                 if len(orig_title) >= 4 and orig_title[:10] in headline:
                     raw_date = rd
                     break
 
-        # 判断结果
         if raw_date is None:
-            # 完全找不到原始文章，来路不明，丢弃
             logger.warning("  日期校验: 丢弃(无法回溯原文) → %s", headline)
             continue
 
@@ -122,8 +99,6 @@ def _validate_dates(items: List[Dict], original_articles: List[Dict], max_hours:
 
     return validated
 
-
-# ───────── 豆包对话 ─────────
 
 def _parse_json(text: str):
     text = text.strip()
@@ -169,7 +144,7 @@ def summarize_category(cat: Dict, articles: List[Dict], today: str, yesterday: s
 
     prompt = f"""今天是 {today}，昨天是 {yesterday}。
 
-你是 AI 行业编辑，正在整理【{cat['name']}】分类的昨日新闻。
+你是行业编辑，正在整理【{cat['name']}】分类的昨日新闻。
 
 以下是候选文章（共 {len(articles)} 条），每条都有"原始时间字段"：
 
@@ -236,7 +211,6 @@ def summarize_category(cat: Dict, articles: List[Dict], today: str, yesterday: s
             items  = parsed.get("items", [])
             logger.info("  [%s] AI 返回 %d 条（原 %d 条）", cat["name"], len(items), len(articles))
 
-            # ★ 关键改动：AI 输出后，用代码再校验一次日期 ★
             items = _validate_dates(items, articles, max_hours=48)
             logger.info("  [%s] 日期校验后保留 %d 条", cat["name"], len(items))
 

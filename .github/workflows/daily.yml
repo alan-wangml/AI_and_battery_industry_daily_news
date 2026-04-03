@@ -1,4 +1,4 @@
-name: AI 行业日报
+name: 行业日报（AI + 电池）
 
 on:
   schedule:
@@ -27,6 +27,7 @@ jobs:
           DOUBAO_API_KEY=${{ secrets.DOUBAO_API_KEY }}
           DOUBAO_MODEL=${{ secrets.DOUBAO_MODEL }}
           SERPER_API_KEY=${{ secrets.SERPER_API_KEY }}
+          SERPER_API_KEY_BATTERY=${{ secrets.SERPER_API_KEY_BATTERY }}
           OUTLOOK_EMAIL=${{ secrets.OUTLOOK_EMAIL }}
           OUTLOOK_PASSWORD=${{ secrets.OUTLOOK_PASSWORD }}
           RECIPIENT_EMAILS=${{ secrets.RECIPIENT_EMAILS }}
@@ -35,13 +36,18 @@ jobs:
       - name: 创建必要目录
         run: mkdir -p logs cache output
 
-      - name: 运行日报
-        run: python main.py
+      # ── AI 行业日报 ──
+      - name: 运行 AI 行业日报
+        run: python main.py --profile ai
+
+      # ── 电池行业日报 ──
+      - name: 运行电池行业日报
+        run: python main.py --profile battery
 
       - name: 上传 HTML 产物
         uses: actions/upload-artifact@v5
         if: always()
         with:
-          name: daily-report-${{ github.run_id }}
+          name: daily-reports-${{ github.run_id }}
           path: output/*.html
           retention-days: 7

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-新闻抓取 - 搜昨天的 AI 新闻
+新闻抓取 - 搜昨天的行业新闻（多行业通用版）
 """
 
 import os
@@ -12,8 +12,7 @@ from typing import List, Dict
 
 logger = logging.getLogger(__name__)
 
-SERPER_API_KEY = os.environ.get("SERPER_API_KEY", "")
-SERPER_URL     = "https://google.serper.dev/news"
+SERPER_URL = "https://google.serper.dev/news"
 
 _DATE_FMTS = ["%b %d, %Y", "%Y-%m-%d", "%d %b %Y", "%Y/%m/%d", "%m/%d/%Y"]
 
@@ -47,11 +46,9 @@ def _to_ymd(date_str: str) -> str:
     return dt.strftime("%Y/%m/%d") if dt else date_str
 
 
-def fetch_category(cat_id: str, queries: List[str], lookback_days: int = 2) -> List[Dict]:
-    """
-    搜一个分类，合并多个查询词，本地过滤日期后返回
-    """
-    # 只保留昨天和今天的文章（容忍时区误差）
+def fetch_category(cat_id: str, queries: List[str],
+                   serper_api_key: str, lookback_days: int = 2) -> List[Dict]:
+    """搜一个分类，合并多个查询词，本地过滤日期后返回"""
     now     = datetime.now(timezone.utc)
     cutoff  = now - timedelta(days=lookback_days)
     seen_links = set()
@@ -61,7 +58,7 @@ def fetch_category(cat_id: str, queries: List[str], lookback_days: int = 2) -> L
         try:
             resp = requests.post(
                 SERPER_URL,
-                headers={"X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json"},
+                headers={"X-API-KEY": serper_api_key, "Content-Type": "application/json"},
                 json={"q": query, "gl": "cn", "hl": "zh-cn", "num": 10, "tbs": "qdr:d2"},
                 timeout=15,
             )
@@ -71,12 +68,10 @@ def fetch_category(cat_id: str, queries: List[str], lookback_days: int = 2) -> L
                 raw_date = item.get("date", "")
                 pub_dt   = _parse_date(raw_date)
 
-                # 本地日期过滤：能解析出日期的，超过 lookback_days 直接丢弃
                 if pub_dt and pub_dt < cutoff:
                     logger.debug("  丢弃旧文章 [%s]: %s", raw_date, item.get("title", "")[:30])
                     continue
 
-                # 去重
                 if link and link in seen_links:
                     continue
                 seen_links.add(link)
@@ -87,7 +82,7 @@ def fetch_category(cat_id: str, queries: List[str], lookback_days: int = 2) -> L
                     "link":      item.get("link",    ""),
                     "published": _to_ymd(raw_date),
                     "source":    item.get("source",  ""),
-                    "raw_date":  raw_date,  # 原始时间，给豆包二次核验用
+                    "raw_date":  raw_date,
                 })
         except Exception as e:
             logger.warning("搜索失败 [%s - %s]: %s", cat_id, query, e)
@@ -96,12 +91,20 @@ def fetch_category(cat_id: str, queries: List[str], lookback_days: int = 2) -> L
     return articles
 
 
-def fetch_all(categories: List[Dict], lookback_days: int = 2) -> Dict[str, List[Dict]]:
-    """抓取所有分类，返回 {cat_id: [articles]}"""
+def fetch_all(categories: List[Dict], lookback_days: int = 2,
+              serper_key_env: str = "SERPER_API_KEY") -> Dict[str, List[Dict]]:
+    """
+    抓取所有分类，返回 {cat_id: [articles]}
+    serper_key_env: 环境变量名，不同行业可用不同的 Serper Key
+    """
+    serper_api_key = os.environ.get(serper_key_env, "")
+    if not serper_api_key:
+        raise ValueError(f"环境变量 {serper_key_env} 未设置")
+
     result = {}
     total  = 0
     for cat in categories:
-        arts = fetch_category(cat["id"], cat["queries"], lookback_days)
+        arts = fetch_category(cat["id"], cat["queries"], serper_api_key, lookback_days)
         result[cat["id"]] = arts
         total += len(arts)
     logger.info("抓取完成，共 %d 条候选", total)
