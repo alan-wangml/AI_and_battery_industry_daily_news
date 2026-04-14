@@ -170,11 +170,17 @@ def _get_email_html(msg: email.message.Message) -> str:
 def fetch_alerts_from_gmail(
     gmail_address: str = "",
     gmail_password: str = "",
-    lookback_days: int = 2,
+    lookback_days: int = 1,
+    alert_subjects: Optional[List[str]] = None,
 ) -> List[Dict]:
     """
     连接 Gmail IMAP，读取最近 lookback_days 天内的 Google Alerts 邮件，
     解析出所有新闻条目。
+
+    alert_subjects: 只处理邮件标题中包含这些关键词的邮件。
+                    Google Alerts 邮件标题格式为 "Google 快讯 - 固态电池 最新进展"，
+                    传入 ["固态电池", "钠离子电池"] 就只处理这两个 Alert 的邮件。
+                    为 None 或空列表时处理所有 Alerts 邮件。
 
     返回: [{title, summary, link, source, raw_date, published}, ...]
     """
@@ -223,6 +229,13 @@ def fetch_alerts_from_gmail(
             # 获取邮件日期
             email_date = msg.get("Date", "")
             subject    = _decode_mime_str(msg.get("Subject", ""))
+
+            # ── 按标题过滤：只处理属于当前行业的 Alert ──
+            if alert_subjects:
+                matched = any(kw in subject for kw in alert_subjects)
+                if not matched:
+                    logger.debug("  跳过不匹配的邮件: %s", subject[:50])
+                    continue
 
             # 解析 HTML 正文
             html_body = _get_email_html(msg)

@@ -57,7 +57,7 @@ def _to_ymd(date_str: str) -> str:
 
 
 def fetch_category_serper(cat_id: str, queries: List[str],
-                          serper_api_key: str, lookback_days: int = 1) -> List[Dict]:
+                          serper_api_key: str, lookback_days: int = 2) -> List[Dict]:
     """Serper 搜一个分类（原逻辑保留）"""
     now     = datetime.now(timezone.utc)
     cutoff  = now - timedelta(days=lookback_days)
@@ -103,14 +103,15 @@ def fetch_category_serper(cat_id: str, queries: List[str],
 #  统一入口
 # ═══════════════════════════════════════════════════
 
-def fetch_all(categories: List[Dict], lookback_days: int = 2,
-              serper_key_env: str = "SERPER_API_KEY") -> Dict[str, List[Dict]]:
+def fetch_all(categories: List[Dict], lookback_days: int = 1,
+              serper_key_env: str = "SERPER_API_KEY",
+              alert_subjects: list = None) -> Dict[str, List[Dict]]:
     """
     抓取所有分类的新闻，返回 {cat_id: [articles]}。
 
     优先使用 Gmail Google Alerts：
       - 需要设置 GMAIL_ADDRESS 和 GMAIL_APP_PASSWORD 环境变量
-      - 从 Gmail 读取所有 Alerts 邮件，按关键词分配到各分类
+      - alert_subjects: 只处理标题包含这些关键词的 Alert 邮件，用于区分行业
 
     备用 Serper API：
       - 如果 Gmail 未配置或抓取失败，回退到 Serper
@@ -129,6 +130,7 @@ def fetch_all(categories: List[Dict], lookback_days: int = 2,
                 gmail_address=gmail_addr,
                 gmail_password=gmail_pwd,
                 lookback_days=lookback_days,
+                alert_subjects=alert_subjects,
             )
 
             if all_articles:

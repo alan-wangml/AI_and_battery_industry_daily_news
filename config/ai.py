@@ -7,6 +7,27 @@ REPORT_TITLE = "AI 行业日报"
 REPORT_EMOJI = "🤖"
 SERPER_KEY_ENV = "SERPER_API_KEY"          # 读哪个环境变量
 
+# ── Google Alerts 邮件过滤 ──
+# 只处理邮件标题中包含以下关键词的 Alert 邮件
+# Google Alerts 邮件标题格式: "Google 快讯 - 大模型 发布"
+# 填写你在 google.com/alerts 创建时用的搜索词（或其中的关键部分）
+ALERT_SUBJECTS = [
+    "人工智能",
+    "AI",
+    "大模型",
+    "LLM",
+    "GPT",
+    "Claude",
+    "Gemini",
+    "SDK",
+    "API 开发者",
+    "AI 产品",
+    "AI 研究",
+    "AI 融资",
+    "AI 监管",
+    "AI 传闻",
+]
+
 CATEGORIES = [
     {
         "id":      "news",

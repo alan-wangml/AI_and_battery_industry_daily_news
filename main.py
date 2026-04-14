@@ -46,6 +46,7 @@ def main(profile_name="ai", dry_run=False, no_fetch=False):
     categories = profile.CATEGORIES
     title      = profile.REPORT_TITLE
     serper_env = profile.SERPER_KEY_ENV
+    alert_subjects = getattr(profile, "ALERT_SUBJECTS", None)  # 新增
 
     cache_file = Path(f"cache/last_{profile_name}.json")
 
@@ -61,9 +62,10 @@ def main(profile_name="ai", dry_run=False, no_fetch=False):
             cache = json.load(f)
         summarized = cache["summarized"]
     else:
-        # Step 1: 抓取昨日新闻（传入对应的 Serper Key 环境变量名）
-        logger.info("Step 1/3: Serper 抓取昨日新闻...")
-        raw_news = fetch_all(categories, serper_key_env=serper_env)
+        # Step 1: 抓取昨日新闻
+        logger.info("Step 1/3: 抓取昨日新闻...")
+        raw_news = fetch_all(categories, serper_key_env=serper_env,
+                             alert_subjects=alert_subjects)
 
         # Step 2: 豆包筛选 + 核验时间
         logger.info("Step 2/3: 豆包筛选核验时间...")
@@ -79,7 +81,7 @@ def main(profile_name="ai", dry_run=False, no_fetch=False):
         logger.warning("没有有效新闻，跳过生成")
         return
 
-    # Step 3: 生成 HTML（传入行业标题和 profile 名）
+    # Step 3: 生成 HTML
     logger.info("Step 3/3: 生成 HTML...")
     html_path = generate_html(categories, summarized,
                               report_title=title, profile=profile_name)
