@@ -309,6 +309,8 @@ def assign_to_categories(
                     result[cat_id].append(art)
                     matched = True
                     break  # 一个分类只匹配一次
+            if matched:
+                break
 
         # 未匹配任何分类 → 放入第一个分类（兜底）
         if not matched and categories:
