@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-AI 摘要 - 豆包对每个分类的文章进行筛选、核验时间、压缩摘要
+AI 摘要 - 豆包对每个分类的文章进行筛选、压缩摘要
+（时效性由 Google Alerts 保证，不再做日期校验）
 """
 
 import os
-import re
 import json
 import logging
 import requests
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import List, Dict
 
 logger = logging.getLogger(__name__)
@@ -16,88 +16,6 @@ logger = logging.getLogger(__name__)
 DOUBAO_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3/chat/completions"
 DOUBAO_API_KEY  = os.environ.get("DOUBAO_API_KEY", "")
 DOUBAO_MODEL    = os.environ.get("DOUBAO_MODEL", "")
-
-# ───────── 日期解析（与 news_fetcher 保持一致） ─────────
-_DATE_FMTS = ["%b %d, %Y", "%Y-%m-%d", "%d %b %Y", "%Y/%m/%d", "%m/%d/%Y"]
-
-
-def _parse_date(date_str: str):
-    if not date_str:
-        return None
-    m = re.match(r"(\d+)\s*(hour|day|week|month|小时|天|周|个月|分钟|minute|min)", date_str, re.I)
-    if m:
-        n, unit = int(m.group(1)), m.group(2).lower()
-        unit_map = {
-            "hour": "hour", "小时": "hour", "分钟": "minute", "minute": "minute", "min": "minute",
-            "day": "day", "天": "day",
-            "week": "week", "周": "week",
-            "month": "month", "个月": "month",
-        }
-        mapped = unit_map.get(unit, "day")
-        delta = {
-            "minute": timedelta(minutes=n),
-            "hour":   timedelta(hours=n),
-            "day":    timedelta(days=n),
-            "week":   timedelta(weeks=n),
-            "month":  timedelta(days=n * 30),
-        }.get(mapped, timedelta(days=n))
-        return datetime.now(timezone.utc) - delta
-    for fmt in _DATE_FMTS:
-        try:
-            return datetime.strptime(date_str.strip(), fmt).replace(tzinfo=timezone.utc)
-        except ValueError:
-            continue
-    return None
-
-
-def _is_within_range(date_str: str, max_hours: int = 48) -> bool:
-    dt = _parse_date(date_str)
-    if dt is None:
-        return False
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=max_hours)
-    return dt >= cutoff
-
-
-def _validate_dates(items: List[Dict], original_articles: List[Dict], max_hours: int = 48) -> List[Dict]:
-    link_to_date = {}
-    title_to_date = {}
-    for art in original_articles:
-        link = art.get("link", "").strip()
-        if link:
-            link_to_date[link] = art.get("raw_date", "")
-        title = art.get("title", "").strip()
-        if title:
-            title_to_date[title] = art.get("raw_date", "")
-
-    validated = []
-    for item in items:
-        item_link  = item.get("link", "").strip()
-        headline   = item.get("headline", "")
-        raw_date   = None
-
-        if item_link in link_to_date:
-            raw_date = link_to_date[item_link]
-        else:
-            for orig_title, rd in title_to_date.items():
-                if len(headline) >= 4 and headline[:10] in orig_title:
-                    raw_date = rd
-                    break
-                if len(orig_title) >= 4 and orig_title[:10] in headline:
-                    raw_date = rd
-                    break
-
-        if raw_date is None:
-            logger.warning("  日期校验: 丢弃(无法回溯原文) → %s", headline)
-            continue
-
-        if not _is_within_range(raw_date, max_hours):
-            logger.warning("  日期校验: 丢弃(旧闻) [%s] → %s", raw_date, headline)
-            continue
-
-        validated.append(item)
-        logger.debug("  日期校验: 通过 [%s] → %s", raw_date, headline)
-
-    return validated
 
 
 def _parse_json(text: str):
@@ -136,53 +54,28 @@ def summarize_category(cat: Dict, articles: List[Dict], today: str, yesterday: s
     news_text = ""
     for i, a in enumerate(articles):
         news_text += (
-            f"[{i}] 原始时间字段：「{a['raw_date']}」| 来源：{a['source']}\n"
+            f"[{i}] 来源：{a['source']}\n"
             f"    标题：{a['title']}\n"
             f"    链接：{a['link']}\n"
-            f"    摘要：{a['summary'][:150]}\n\n"
+            f"    摘要：{a['summary'][:120]}\n\n"
         )
 
-    prompt = f"""今天是 {today}，昨天是 {yesterday}。
+    prompt = f"""你是行业编辑，正在整理【{cat['name']}】分类的昨日（{yesterday}）新闻。
 
-你是行业编辑，正在整理【{cat['name']}】分类的昨日新闻。
-
-以下是候选文章（共 {len(articles)} 条），每条都有"原始时间字段"：
+以下是候选文章（共 {len(articles)} 条，来自 Google Alerts，时效性已确认）：
 
 {news_text}
 
-=== 第一步：严格时间核验 ===
+=== 任务 ===
 
-对每条文章的"原始时间字段"逐一判断，规则如下：
+从中选出最值得关注的 3-5 条，内容高度重复的合并成一条。
 
-相对时间（如"X小时前"、"X hours ago"）：
-- 今天是 {today}，以此推算：
-- 24小时以内 = 今天或昨天，保留
-- 超过24小时 = 丢弃
-
-中文相对时间（如"X天前"、"X分钟前"）：
-- "X分钟前"、"X小时前" = 保留
-- "1天前" = 昨天，保留
-- "2天前"及以上 = 丢弃
-
-绝对日期（如 2026/03/20、Mar 20, 2026）：
-- 只保留日期等于昨天 {yesterday} 的
-- 其他日期一律丢弃
-
-时间字段为空或无法判断：丢弃，不要猜测
-
-=== 第二步：筛选整理 ===
-
-从通过时间核验的文章里，选出最值得关注的 3-5 条。
-内容高度重复的合并成一条。
-
-=== 第三步：每条输出 ===
-
+每条输出：
 - headline：重写标题，20字以内，主语+事件，简洁有力
-- digest：120字左右的摘要（不能少于100字，不能超过140字），要写清楚：
+- digest：120字左右的摘要（不少于100字，不超过140字），写清楚：
   1. 具体发生了什么（谁、做了什么、关键数据）
   2. 为什么重要或有什么影响
   3. 背景补充（如果有）
-  注意：120字是硬性要求，宁可多写细节也不要凑字数
 - importance：重要/关注/一般
 - source：来源媒体名
 - link：从文章的"链接："字段原样复制，一字不改
@@ -202,7 +95,7 @@ def summarize_category(cat: Dict, articles: List[Dict], today: str, yesterday: s
   ]
 }}
 
-如果没有通过时间核验的文章，输出：{{"items": []}}"""
+如果没有值得收录的文章，输出：{{"items": []}}"""
 
     for attempt in range(3):
         try:
@@ -210,10 +103,6 @@ def summarize_category(cat: Dict, articles: List[Dict], today: str, yesterday: s
             parsed = _parse_json(raw)
             items  = parsed.get("items", [])
             logger.info("  [%s] AI 返回 %d 条（原 %d 条）", cat["name"], len(items), len(articles))
-
-            items = _validate_dates(items, articles, max_hours=48)
-            logger.info("  [%s] 日期校验后保留 %d 条", cat["name"], len(items))
-
             return items
         except Exception as e:
             logger.warning("  [%s] 第%d次失败: %s", cat["name"], attempt + 1, e)
