@@ -47,7 +47,7 @@ def _chat(messages: list, max_tokens: int = 3000, temperature: float = 0.2) -> s
     return resp.json()["choices"][0]["message"]["content"].strip()
 
 
-def summarize_category(cat: Dict, articles: List[Dict], today: str, yesterday: str) -> List[Dict]:
+def summarize_category(cat: Dict, articles: List[Dict], today: str, week_start: str) -> List[Dict]:
     if not articles:
         return []
 
@@ -60,7 +60,7 @@ def summarize_category(cat: Dict, articles: List[Dict], today: str, yesterday: s
             f"    摘要：{a['summary'][:120]}\n\n"
         )
 
-    prompt = f"""你是行业编辑，正在整理【{cat['name']}】分类的昨日（{yesterday}）新闻。
+    prompt = f"""你是行业编辑，正在整理【{cat['name']}】分类过去一周（{week_start} 至 {today}）的新闻。
 
 以下是候选文章（共 {len(articles)} 条，来自 Google Alerts，时效性已确认）：
 
@@ -68,7 +68,7 @@ def summarize_category(cat: Dict, articles: List[Dict], today: str, yesterday: s
 
 === 任务 ===
 
-从中选出最值得关注的 3-5 条，内容高度重复的合并成一条。
+从中选出本周最值得关注的 5-8 条，内容高度重复的合并成一条。
 
 每条输出：
 - headline：重写标题，20字以内，主语+事件，简洁有力
@@ -113,14 +113,14 @@ def summarize_category(cat: Dict, articles: List[Dict], today: str, yesterday: s
 
 
 def summarize_all(categories: List[Dict], raw_news: Dict[str, List[Dict]]) -> Dict[str, List[Dict]]:
-    today     = datetime.now().strftime("%Y年%m月%d日")
-    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y年%m月%d日")
+    today      = datetime.now().strftime("%Y年%m月%d日")
+    week_start = (datetime.now() - timedelta(days=7)).strftime("%Y年%m月%d日")
 
     result = {}
     for cat in categories:
         cat_id   = cat["id"]
         articles = raw_news.get(cat_id, [])
         logger.info("豆包处理: [%s] %d 条候选", cat["name"], len(articles))
-        result[cat_id] = summarize_category(cat, articles, today, yesterday)
+        result[cat_id] = summarize_category(cat, articles, today, week_start)
 
     return result

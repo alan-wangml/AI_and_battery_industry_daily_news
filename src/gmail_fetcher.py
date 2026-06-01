@@ -170,7 +170,7 @@ def _get_email_html(msg: email.message.Message) -> str:
 def fetch_alerts_from_gmail(
     gmail_address: str = "",
     gmail_password: str = "",
-    lookback_days: int = 1,
+    lookback_days: int = 7,
     alert_subjects: Optional[List[str]] = None,
 ) -> List[Dict]:
     """

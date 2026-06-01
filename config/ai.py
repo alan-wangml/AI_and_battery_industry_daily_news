@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-AI 行业日报 - 分类与搜索词配置
+AI 行业周报 - 分类与搜索词配置
 """
 
-REPORT_TITLE = "AI 行业日报"
+REPORT_TITLE = "AI 行业周报"
 REPORT_EMOJI = "🤖"
 
 # ── Google Alerts 邮件过滤 ──

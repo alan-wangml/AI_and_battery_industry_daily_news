@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-行业日报 - 主程序（多行业版）
+行业周报 - 主程序（多行业版）
 用法：
-    python main.py --profile ai          # AI 行业日报
-    python main.py --profile battery     # 电池行业日报
+    python main.py --profile ai          # AI 行业周报
+    python main.py --profile battery     # 电池行业周报
     python main.py --profile ai --dry-run
 """
 
@@ -34,7 +34,7 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("logs/daily.log", encoding="utf-8"),
+        logging.FileHandler("logs/weekly.log", encoding="utf-8"),
     ],
 )
 logger = logging.getLogger(__name__)
@@ -61,9 +61,9 @@ def main(profile_name="ai", dry_run=False, no_fetch=False):
             cache = json.load(f)
         summarized = cache["summarized"]
     else:
-        # Step 1: 抓取昨日新闻
-        logger.info("Step 1/3: 抓取昨日新闻...")
-        raw_news = fetch_all(categories, alert_subjects=alert_subjects)
+        # Step 1: 抓取过去一周新闻
+        logger.info("Step 1/3: 抓取过去一周新闻...")
+        raw_news = fetch_all(categories, lookback_days=7, alert_subjects=alert_subjects)
 
         # Step 2: 豆包筛选 + 核验时间
         logger.info("Step 2/3: 豆包筛选核验时间...")
@@ -96,7 +96,7 @@ def main(profile_name="ai", dry_run=False, no_fetch=False):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="行业日报生成器")
+    parser = argparse.ArgumentParser(description="行业周报生成器")
     parser.add_argument("--profile",  default="ai",
                         choices=["ai", "battery"],
                         help="行业配置：ai=AI行业, battery=电池行业")

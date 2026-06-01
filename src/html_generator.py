@@ -115,20 +115,21 @@ def _section_html(cat: Dict, items: List[Dict]) -> str:
 
 
 def generate_html(categories: List[Dict], summarized: Dict[str, List[Dict]],
-                  report_title: str = "AI 行业日报",
+                  report_title: str = "AI 行业周报",
                   profile: str = "ai") -> str:
     """
-    生成 HTML 日报。
-    report_title: 页面标题，如 "AI 行业日报" / "电池行业日报"
+    生成 HTML 周报。
+    report_title: 页面标题，如 "AI 行业周报" / "电池行业周报"
     profile: 用于文件名前缀区分，如 ai / battery
     """
     OUTPUT_DIR.mkdir(exist_ok=True)
-    today     = datetime.now().strftime("%Y年%m月%d日")
-    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y年%m月%d日")
+    today      = datetime.now().strftime("%Y年%m月%d日")
+    week_start = (datetime.now() - timedelta(days=7)).strftime("%Y年%m月%d日")
+    date_range = f"{week_start} - {today}"
 
     # 文件名带 profile 前缀，避免两个行业互相覆盖
     prefix   = profile.upper()
-    filename = f"{prefix}-Daily-{datetime.now().strftime('%Y%m%d')}.html"
+    filename = f"{prefix}-Weekly-{datetime.now().strftime('%Y%m%d')}.html"
     output   = str(OUTPUT_DIR / filename)
 
     total = sum(len(v) for v in summarized.values())
@@ -146,14 +147,14 @@ def generate_html(categories: List[Dict], summarized: Dict[str, List[Dict]],
     )
 
     # ── logo 文字根据行业变化 ──
-    logo_text = _escape(report_title).replace("日报", "").strip()
+    logo_text = _escape(report_title).replace("周报", "").strip()
 
     html = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{_escape(report_title)} · {yesterday}</title>
+<title>{_escape(report_title)} · {date_range}</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
   :root {{
@@ -229,11 +230,11 @@ def generate_html(categories: List[Dict], summarized: Dict[str, List[Dict]],
 
 <div class="header">
   <div class="header-left">
-    <div class="logo">{_escape(logo_text)} DAILY</div>
+    <div class="logo">{_escape(logo_text)} WEEKLY</div>
     <div class="divider-v"></div>
-    <div class="date-label">{today} · 早报</div>
+    <div class="date-label">{date_range} · 周报</div>
   </div>
-  <div class="header-right">共 {total} 条 · 今日 {today} 发布</div>
+  <div class="header-right">共 {total} 条 · {today} 发布</div>
 </div>
 
 <div class="nav-tabs">
@@ -242,19 +243,19 @@ def generate_html(categories: List[Dict], summarized: Dict[str, List[Dict]],
 
 <div class="main">
   <div class="stats-bar">
-    <div class="stat-item"><div class="stat-num">{total}</div><div class="stat-label">今日条目</div></div>
+    <div class="stat-item"><div class="stat-num">{total}</div><div class="stat-label">本周条目</div></div>
     <div class="stat-divider"></div>
     <div class="stat-item"><div class="stat-num">{important}</div><div class="stat-label">重要事件</div></div>
     <div class="stat-divider"></div>
     <div class="stat-item"><div class="stat-num">{len([c for c in categories if summarized.get(c['id'])])}</div><div class="stat-label">覆盖分类</div></div>
     <div class="stat-divider"></div>
-    <div class="stat-item"><div class="stat-num" style="color:var(--green);font-size:15px">{yesterday}</div><div class="stat-label">数据时效</div></div>
+    <div class="stat-item"><div class="stat-num" style="color:var(--green);font-size:15px">{date_range}</div><div class="stat-label">数据时效</div></div>
   </div>
 
 {sections}
 </div>
 
-<div class="footer">{_escape(logo_text)} DAILY &middot; {yesterday} &middot; Google Alerts + 豆包 AI &middot; 仅供参考</div>
+<div class="footer">{_escape(logo_text)} WEEKLY &middot; {date_range} &middot; Google Alerts + 豆包 AI &middot; 仅供参考</div>
 
 <script>
 function toggle(el) {{ el.closest('.news-item').classList.toggle('open'); }}

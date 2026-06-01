@@ -13,7 +13,7 @@ from typing import List, Dict, Optional
 logger = logging.getLogger(__name__)
 
 
-def fetch_all(categories: List[Dict], lookback_days: int = 1,
+def fetch_all(categories: List[Dict], lookback_days: int = 7,
               alert_subjects: Optional[List[str]] = None) -> Dict[str, List[Dict]]:
     """
     通过 Gmail Google Alerts 抓取所有分类的新闻，返回 {cat_id: [articles]}。

@@ -22,23 +22,25 @@ SMTP_HOST       = "smtp.163.com"
 SMTP_PORT       = 465
 
 
-def send_report(html_path: str, report_title: str = "AI 行业日报"):
+def send_report(html_path: str, report_title: str = "AI 行业周报"):
     """
-    发送日报邮件。
-    report_title: 邮件标题前缀，如 "AI 行业日报" / "电池行业日报"
+    发送周报邮件。
+    report_title: 邮件标题前缀，如 "AI 行业周报" / "电池行业周报"
     """
     if not SENDER_EMAIL or not SENDER_PASSWORD:
         raise ValueError("OUTLOOK_EMAIL / OUTLOOK_PASSWORD 未设置")
     if not RECIPIENTS:
         raise ValueError("RECIPIENT_EMAILS 未设置")
 
-    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y年%m月%d日")
-    subject   = f"{report_title} · {yesterday}"
+    today      = datetime.now().strftime("%Y年%m月%d日")
+    week_start = (datetime.now() - timedelta(days=7)).strftime("%Y年%m月%d日")
+    date_range = f"{week_start} - {today}"
+    subject    = f"{report_title} · {date_range}"
 
     with open(html_path, "r", encoding="utf-8") as f:
         html_content = f.read()
 
-    plain_text = f"{report_title} · {yesterday}\n\n请下载附件用浏览器打开查看完整日报。"
+    plain_text = f"{report_title} · {date_range}\n\n请下载附件用浏览器打开查看完整周报。"
 
     msg = MIMEMultipart("mixed")
     msg["From"]    = SENDER_EMAIL
