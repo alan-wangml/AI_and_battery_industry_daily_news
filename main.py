@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-行业周报 - 主程序（多行业版）
+行业日报/周报 - 主程序（多行业 + 多周期版）
 用法：
-    python main.py --profile ai          # AI 行业周报
-    python main.py --profile battery     # 电池行业周报
-    python main.py --profile ai --dry-run
+    python main.py --profile ai --period daily     # AI 行业日报（每天）
+    python main.py --profile ai --period weekly    # AI 行业周报（每周）
+    python main.py --profile battery --period daily
+    python main.py --profile ai --period weekly --dry-run
 """
 
 import sys
@@ -18,7 +19,7 @@ from dotenv import load_dotenv
 load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent))
 
-from config.settings    import load_profile
+from config.settings    import load_profile, load_period
 from src.news_fetcher   import fetch_all
 from src.ai_summarizer  import summarize_all
 from src.html_generator import generate_html
@@ -34,25 +35,27 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("logs/weekly.log", encoding="utf-8"),
+        logging.FileHandler("logs/report.log", encoding="utf-8"),
     ],
 )
 logger = logging.getLogger(__name__)
 
 
-def main(profile_name="ai", dry_run=False, no_fetch=False):
-    # ── 加载行业配置 ──
+def main(profile_name="ai", period_name="daily", dry_run=False, no_fetch=False):
+    # ── 加载行业配置 + 周期配置 ──
     profile    = load_profile(profile_name)
+    period     = load_period(period_name)
     categories = profile.CATEGORIES
-    title      = profile.REPORT_TITLE
+    title      = f"{profile.REPORT_TITLE}{period['label']}"   # 如「AI 行业日报」/「AI 行业周报」
     alert_subjects = getattr(profile, "ALERT_SUBJECTS", None)
 
-    cache_file = Path(f"cache/last_{profile_name}.json")
+    # 缓存按 profile + period 区分，避免日报/周报互相串数据
+    cache_file = Path(f"cache/last_{profile_name}_{period_name}.json")
 
     start = datetime.now()
     logger.info("=" * 50)
-    logger.info("开始生成 %s [%s] profile=%s",
-                title, start.strftime("%Y-%m-%d %H:%M:%S"), profile_name)
+    logger.info("开始生成 %s [%s] profile=%s period=%s",
+                title, start.strftime("%Y-%m-%d %H:%M:%S"), profile_name, period_name)
     logger.info("=" * 50)
 
     if no_fetch and cache_file.exists():
@@ -61,13 +64,14 @@ def main(profile_name="ai", dry_run=False, no_fetch=False):
             cache = json.load(f)
         summarized = cache["summarized"]
     else:
-        # Step 1: 抓取过去一周新闻
-        logger.info("Step 1/3: 抓取过去一周新闻...")
-        raw_news = fetch_all(categories, lookback_days=7, alert_subjects=alert_subjects)
+        # Step 1: 抓取回溯期内新闻
+        logger.info("Step 1/3: 抓取最近 %d 天新闻...", period["lookback_days"])
+        raw_news = fetch_all(categories, lookback_days=period["lookback_days"],
+                             alert_subjects=alert_subjects)
 
-        # Step 2: 豆包筛选 + 核验时间
-        logger.info("Step 2/3: 豆包筛选核验时间...")
-        summarized = summarize_all(categories, raw_news)
+        # Step 2: 豆包筛选摘要
+        logger.info("Step 2/3: 豆包筛选摘要...")
+        summarized = summarize_all(categories, raw_news, period)
 
         with open(cache_file, "w", encoding="utf-8") as f:
             json.dump({"summarized": summarized}, f, ensure_ascii=False, indent=2)
@@ -82,7 +86,7 @@ def main(profile_name="ai", dry_run=False, no_fetch=False):
     # Step 3: 生成 HTML
     logger.info("Step 3/3: 生成 HTML...")
     html_path = generate_html(categories, summarized,
-                              report_title=title, profile=profile_name)
+                              report_title=title, profile=profile_name, period=period)
     logger.info("已保存: %s", html_path)
 
     # 发送邮件
@@ -90,17 +94,21 @@ def main(profile_name="ai", dry_run=False, no_fetch=False):
         logger.info("dry-run，跳过邮件发送，HTML 文件在: %s", html_path)
     else:
         logger.info("发送邮件...")
-        send_report(html_path, report_title=title)
+        send_report(html_path, report_title=title, period=period)
 
     logger.info("完成！耗时 %d 秒", (datetime.now() - start).seconds)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="行业周报生成器")
+    parser = argparse.ArgumentParser(description="行业日报/周报生成器")
     parser.add_argument("--profile",  default="ai",
                         choices=["ai", "battery"],
                         help="行业配置：ai=AI行业, battery=电池行业")
+    parser.add_argument("--period",   default="daily",
+                        choices=["daily", "weekly"],
+                        help="报告周期：daily=日报(回溯1天), weekly=周报(回溯7天)")
     parser.add_argument("--dry-run",  action="store_true", help="不发邮件，只生成 HTML")
     parser.add_argument("--no-fetch", action="store_true", help="用缓存数据，不重新抓取")
     args = parser.parse_args()
-    main(profile_name=args.profile, dry_run=args.dry_run, no_fetch=args.no_fetch)
+    main(profile_name=args.profile, period_name=args.period,
+         dry_run=args.dry_run, no_fetch=args.no_fetch)

@@ -115,21 +115,33 @@ def _section_html(cat: Dict, items: List[Dict]) -> str:
 
 
 def generate_html(categories: List[Dict], summarized: Dict[str, List[Dict]],
-                  report_title: str = "AI 行业周报",
-                  profile: str = "ai") -> str:
+                  report_title: str = "AI 行业日报",
+                  profile: str = "ai",
+                  period: Dict = None) -> str:
     """
-    生成 HTML 周报。
-    report_title: 页面标题，如 "AI 行业周报" / "电池行业周报"
+    生成 HTML 报告（日报 / 周报通用）。
+    report_title: 页面标题，如 "AI 行业日报" / "电池行业周报"
     profile: 用于文件名前缀区分，如 ai / battery
+    period: 周期配置 dict（含 lookback_days/label/en/file_tag），缺省按日报处理
     """
+    if period is None:
+        period = {"lookback_days": 1, "label": "日报", "en": "DAILY", "file_tag": "Daily"}
+
     OUTPUT_DIR.mkdir(exist_ok=True)
     today      = datetime.now().strftime("%Y年%m月%d日")
-    week_start = (datetime.now() - timedelta(days=7)).strftime("%Y年%m月%d日")
-    date_range = f"{week_start} - {today}"
+    lookback   = period["lookback_days"]
+    start_str  = (datetime.now() - timedelta(days=lookback)).strftime("%Y年%m月%d日")
+    # 日报 → 单日（昨日）；周报 → 区间
+    if lookback <= 1:
+        date_disp  = start_str            # 数据时效显示的日期
+        stat_label = "今日条目"
+    else:
+        date_disp  = f"{start_str} - {today}"
+        stat_label = "本周条目"
 
-    # 文件名带 profile 前缀，避免两个行业互相覆盖
+    # 文件名带 profile 前缀 + 周期标记，避免行业/周期互相覆盖
     prefix   = profile.upper()
-    filename = f"{prefix}-Weekly-{datetime.now().strftime('%Y%m%d')}.html"
+    filename = f"{prefix}-{period['file_tag']}-{datetime.now().strftime('%Y%m%d')}.html"
     output   = str(OUTPUT_DIR / filename)
 
     total = sum(len(v) for v in summarized.values())
@@ -146,15 +158,15 @@ def generate_html(categories: List[Dict], summarized: Dict[str, List[Dict]],
         for c in categories
     )
 
-    # ── logo 文字根据行业变化 ──
-    logo_text = _escape(report_title).replace("周报", "").strip()
+    # ── logo 文字根据行业变化（去掉日报/周报后缀）──
+    logo_text = _escape(report_title).replace("日报", "").replace("周报", "").strip()
 
     html = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{_escape(report_title)} · {date_range}</title>
+<title>{_escape(report_title)} · {date_disp}</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
   :root {{
@@ -230,9 +242,9 @@ def generate_html(categories: List[Dict], summarized: Dict[str, List[Dict]],
 
 <div class="header">
   <div class="header-left">
-    <div class="logo">{_escape(logo_text)} WEEKLY</div>
+    <div class="logo">{_escape(logo_text)} {period['en']}</div>
     <div class="divider-v"></div>
-    <div class="date-label">{date_range} · 周报</div>
+    <div class="date-label">{date_disp} · {period['label']}</div>
   </div>
   <div class="header-right">共 {total} 条 · {today} 发布</div>
 </div>
@@ -243,19 +255,19 @@ def generate_html(categories: List[Dict], summarized: Dict[str, List[Dict]],
 
 <div class="main">
   <div class="stats-bar">
-    <div class="stat-item"><div class="stat-num">{total}</div><div class="stat-label">本周条目</div></div>
+    <div class="stat-item"><div class="stat-num">{total}</div><div class="stat-label">{stat_label}</div></div>
     <div class="stat-divider"></div>
     <div class="stat-item"><div class="stat-num">{important}</div><div class="stat-label">重要事件</div></div>
     <div class="stat-divider"></div>
     <div class="stat-item"><div class="stat-num">{len([c for c in categories if summarized.get(c['id'])])}</div><div class="stat-label">覆盖分类</div></div>
     <div class="stat-divider"></div>
-    <div class="stat-item"><div class="stat-num" style="color:var(--green);font-size:15px">{date_range}</div><div class="stat-label">数据时效</div></div>
+    <div class="stat-item"><div class="stat-num" style="color:var(--green);font-size:15px">{date_disp}</div><div class="stat-label">数据时效</div></div>
   </div>
 
 {sections}
 </div>
 
-<div class="footer">{_escape(logo_text)} WEEKLY &middot; {date_range} &middot; Google Alerts + 豆包 AI &middot; 仅供参考</div>
+<div class="footer">{_escape(logo_text)} {period['en']} &middot; {date_disp} &middot; Google Alerts + 豆包 AI &middot; 仅供参考</div>
 
 <script>
 function toggle(el) {{ el.closest('.news-item').classList.toggle('open'); }}

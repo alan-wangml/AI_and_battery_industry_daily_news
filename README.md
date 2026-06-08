@@ -1,11 +1,11 @@
-# 行业周报自动生成系统
+# 行业日报/周报自动生成系统
 
-自动抓取 Google Alerts 新闻、AI 摘要筛选、生成 HTML 周报并发送邮件。支持 AI 行业和电池行业两个独立配置。
+自动抓取 Google Alerts 新闻、AI 摘要筛选、生成 HTML 日报/周报并发送邮件。支持 AI 行业和电池行业两个独立配置。
 
 ## 工作原理
 
 ```
-GitHub Actions 定时触发（每周一北京时间 8 点）
+GitHub Actions 定时触发（日报每天 8 点 / 周报每周一 8 点，北京时间）
   └→ 读取 Gmail 中的 Google Alerts 邮件（IMAP）
      └→ 解析 HTML，提取新闻标题/摘要/链接
         └→ 按关键词分配到各分类
@@ -47,14 +47,17 @@ pip install requests python-dotenv
 ### 4. 运行
 
 ```bash
-# AI 行业周报
-python main.py --profile ai
+# AI 行业日报（每天，回溯1天）
+python main.py --profile ai --period daily
 
-# 电池行业周报
-python main.py --profile battery
+# AI 行业周报（每周，回溯7天）
+python main.py --profile ai --period weekly
+
+# 电池行业日报
+python main.py --profile battery --period daily
 
 # 只生成 HTML，不发邮件（测试用）
-python main.py --profile ai --dry-run
+python main.py --profile ai --period weekly --dry-run
 
 # 用上次缓存数据，跳过邮件抓取（节省时间）
 python main.py --profile ai --no-fetch
@@ -76,7 +79,7 @@ python main.py --profile ai --no-fetch
 | `OUTLOOK_PASSWORD` | 发件邮箱 SMTP 授权码 |
 | `RECIPIENT_EMAILS` | 收件人列表（逗号分隔） |
 
-配置完成后，每周一北京时间早上 8 点自动运行。也可在 GitHub Actions 页面手动点击 "Run workflow" 触发。
+配置完成后，日报每天、周报每周一北京时间早上 8 点自动运行。也可在 GitHub Actions 页面手动点击 "Run workflow" 触发。
 
 ### 查看产物
 
@@ -85,7 +88,8 @@ python main.py --profile ai --no-fetch
 ## 目录结构
 
 ```
-├── .github/workflows/weekly.yml  # GitHub Actions 定时任务
+├── .github/workflows/daily.yml    # 日报定时任务（每天）
+│   └── weekly.yml                # 周报定时任务（每周一）
 ├── config/
 │   ├── settings.py               # 配置加载器
 │   ├── ai.py                     # AI 行业分类配置
@@ -94,7 +98,7 @@ python main.py --profile ai --no-fetch
 │   ├── gmail_fetcher.py          # Gmail IMAP + Google Alerts 解析
 │   ├── news_fetcher.py           # 抓取入口（调用 gmail_fetcher）
 │   ├── ai_summarizer.py          # 豆包 API 筛选摘要
-│   ├── html_generator.py         # HTML 周报生成
+│   ├── html_generator.py         # HTML 报告生成（日报/周报）
 │   └── email_sender.py           # SMTP 邮件发送
 ├── main.py                        # 主程序入口
 ├── cache/                         # 缓存文件（运行时生成）
@@ -107,7 +111,7 @@ python main.py --profile ai --no-fetch
 以 `config/ai.py` 为参考，修改或新增行业配置：
 
 ```python
-REPORT_TITLE = "AI 行业周报"
+REPORT_TITLE = "AI 行业"   # 行业基名，日报/周报后缀由程序按 --period 自动拼接
 
 # 只处理邮件标题包含这些词的 Alerts 邮件
 ALERT_SUBJECTS = ["大模型", "AI", "GPT", ...]

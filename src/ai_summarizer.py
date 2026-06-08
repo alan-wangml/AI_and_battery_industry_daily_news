@@ -47,7 +47,8 @@ def _chat(messages: list, max_tokens: int = 3000, temperature: float = 0.2) -> s
     return resp.json()["choices"][0]["message"]["content"].strip()
 
 
-def summarize_category(cat: Dict, articles: List[Dict], today: str, week_start: str) -> List[Dict]:
+def summarize_category(cat: Dict, articles: List[Dict], date_phrase: str,
+                       min_items: int, max_items: int) -> List[Dict]:
     if not articles:
         return []
 
@@ -60,7 +61,7 @@ def summarize_category(cat: Dict, articles: List[Dict], today: str, week_start: 
             f"    摘要：{a['summary'][:120]}\n\n"
         )
 
-    prompt = f"""你是行业编辑，正在整理【{cat['name']}】分类过去一周（{week_start} 至 {today}）的新闻。
+    prompt = f"""你是行业编辑，正在整理【{cat['name']}】分类{date_phrase}的新闻。
 
 以下是候选文章（共 {len(articles)} 条，来自 Google Alerts，时效性已确认）：
 
@@ -68,7 +69,7 @@ def summarize_category(cat: Dict, articles: List[Dict], today: str, week_start: 
 
 === 任务 ===
 
-从中选出本周最值得关注的 5-8 条，内容高度重复的合并成一条。
+从中选出最值得关注的 {min_items}-{max_items} 条，内容高度重复的合并成一条。
 
 每条输出：
 - headline：重写标题，20字以内，主语+事件，简洁有力
@@ -112,15 +113,24 @@ def summarize_category(cat: Dict, articles: List[Dict], today: str, week_start: 
     return []
 
 
-def summarize_all(categories: List[Dict], raw_news: Dict[str, List[Dict]]) -> Dict[str, List[Dict]]:
-    today      = datetime.now().strftime("%Y年%m月%d日")
-    week_start = (datetime.now() - timedelta(days=7)).strftime("%Y年%m月%d日")
+def summarize_all(categories: List[Dict], raw_news: Dict[str, List[Dict]],
+                  period: Dict) -> Dict[str, List[Dict]]:
+    today     = datetime.now().strftime("%Y年%m月%d日")
+    lookback  = period["lookback_days"]
+    start_str = (datetime.now() - timedelta(days=lookback)).strftime("%Y年%m月%d日")
+    # 日报 → 昨日单日；周报 → 过去一周区间
+    if lookback <= 1:
+        date_phrase = f"昨日（{start_str}）"
+    else:
+        date_phrase = f"过去一周（{start_str} 至 {today}）"
+    min_items = period["min_items"]
+    max_items = period["max_items"]
 
     result = {}
     for cat in categories:
         cat_id   = cat["id"]
         articles = raw_news.get(cat_id, [])
         logger.info("豆包处理: [%s] %d 条候选", cat["name"], len(articles))
-        result[cat_id] = summarize_category(cat, articles, today, week_start)
+        result[cat_id] = summarize_category(cat, articles, date_phrase, min_items, max_items)
 
     return result

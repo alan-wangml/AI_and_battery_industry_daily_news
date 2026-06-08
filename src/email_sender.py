@@ -22,25 +22,31 @@ SMTP_HOST       = "smtp.163.com"
 SMTP_PORT       = 465
 
 
-def send_report(html_path: str, report_title: str = "AI 行业周报"):
+def send_report(html_path: str, report_title: str = "AI 行业日报", period: dict = None):
     """
-    发送周报邮件。
-    report_title: 邮件标题前缀，如 "AI 行业周报" / "电池行业周报"
+    发送报告邮件（日报 / 周报通用）。
+    report_title: 邮件标题前缀，如 "AI 行业日报" / "电池行业周报"
+    period: 周期配置 dict（含 lookback_days/label），缺省按日报处理
     """
     if not SENDER_EMAIL or not SENDER_PASSWORD:
         raise ValueError("OUTLOOK_EMAIL / OUTLOOK_PASSWORD 未设置")
     if not RECIPIENTS:
         raise ValueError("RECIPIENT_EMAILS 未设置")
 
-    today      = datetime.now().strftime("%Y年%m月%d日")
-    week_start = (datetime.now() - timedelta(days=7)).strftime("%Y年%m月%d日")
-    date_range = f"{week_start} - {today}"
-    subject    = f"{report_title} · {date_range}"
+    if period is None:
+        period = {"lookback_days": 1, "label": "日报"}
+
+    today     = datetime.now().strftime("%Y年%m月%d日")
+    lookback  = period["lookback_days"]
+    start_str = (datetime.now() - timedelta(days=lookback)).strftime("%Y年%m月%d日")
+    # 日报 → 单日；周报 → 区间
+    date_disp = start_str if lookback <= 1 else f"{start_str} - {today}"
+    subject   = f"{report_title} · {date_disp}"
 
     with open(html_path, "r", encoding="utf-8") as f:
         html_content = f.read()
 
-    plain_text = f"{report_title} · {date_range}\n\n请下载附件用浏览器打开查看完整周报。"
+    plain_text = f"{report_title} · {date_disp}\n\n请下载附件用浏览器打开查看完整{period['label']}。"
 
     msg = MIMEMultipart("mixed")
     msg["From"]    = SENDER_EMAIL

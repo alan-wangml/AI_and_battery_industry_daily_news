@@ -1,12 +1,12 @@
-name: 行业周报（AI + 电池）
+name: 行业日报（AI + 电池）
 
 on:
   schedule:
-    - cron: '0 0 * * 1'  # 每周一北京时间早上8点（UTC 周一0点）
+    - cron: '0 0 * * *'  # 每天北京时间早上8点（UTC 0点）
   workflow_dispatch:       # 允许手动触发
 
 jobs:
-  weekly-report:
+  daily-report:
     runs-on: ubuntu-latest
 
     steps:
@@ -36,18 +36,18 @@ jobs:
       - name: 创建必要目录
         run: mkdir -p logs cache output
 
-      # ── AI 行业周报 ──
-      - name: 运行 AI 行业周报
-        run: python main.py --profile ai --period weekly
+      # ── AI 行业日报 ──
+      - name: 运行 AI 行业日报
+        run: python main.py --profile ai --period daily
 
-      # ── 电池行业周报 ──
-      - name: 运行电池行业周报
-        run: python main.py --profile battery --period weekly
+      # ── 电池行业日报 ──
+      - name: 运行电池行业日报
+        run: python main.py --profile battery --period daily
 
       - name: 上传 HTML 产物
         uses: actions/upload-artifact@v5
         if: always()
         with:
-          name: weekly-reports-${{ github.run_id }}
+          name: daily-reports-${{ github.run_id }}
           path: output/*.html
           retention-days: 7

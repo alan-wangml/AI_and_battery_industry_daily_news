@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-电池行业周报 - 分类与搜索词配置
+电池行业 - 分类与搜索词配置
+REPORT_TITLE 为行业基名，最终标题由 main 按周期拼成「…日报 / …周报」
 """
 
-REPORT_TITLE = "电池行业周报"
+REPORT_TITLE = "电池行业"
 REPORT_EMOJI = "🔋"
 
 # ── Google Alerts 邮件过滤 ──
