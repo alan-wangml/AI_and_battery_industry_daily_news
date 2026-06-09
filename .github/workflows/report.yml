@@ -1,0 +1,77 @@
+name: 行业日报与周报
+
+on:
+  schedule:
+    # 日报：每天北京时间早上11点（UTC 03:00）
+    - cron: '0 3 * * *'
+    # 周报：每周一北京时间早上8点（UTC 周一00:00）
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        profile: [ai, battery]
+        period: [daily, weekly]
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: pip install python-dotenv
+
+      - name: 创建 .env 文件
+        run: |
+          cat > .env << EOF
+          DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}
+          DEEPSEEK_MODEL=${{ secrets.DEEPSEEK_MODEL }}
+          GMAIL_ADDRESS=${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}
+          OUTLOOK_EMAIL=${{ secrets.OUTLOOK_EMAIL }}
+          OUTLOOK_PASSWORD=${{ secrets.OUTLOOK_PASSWORD }}
+          RECIPIENT_EMAILS=${{ secrets.RECIPIENT_EMAILS }}
+          EOF
+
+      - name: 验证配置
+        run: |
+          if [ -z "${{ secrets.DEEPSEEK_API_KEY }}" ]; then
+            echo "❌ 错误：DEEPSEEK_API_KEY 未设置"
+            exit 1
+          fi
+          if [ -z "${{ secrets.DEEPSEEK_MODEL }}" ]; then
+            echo "❌ 错误：DEEPSEEK_MODEL 未设置"
+            exit 1
+          fi
+          echo "✅ 所有必要的 Secrets 已配置"
+
+      - name: 创建必要目录
+        run: mkdir -p logs cache output
+
+      - name: 运行 ${{ matrix.profile }} 行业 ${{ matrix.period }}
+        run: python3 main.py --profile ${{ matrix.profile }} --period ${{ matrix.period }}
+        env:
+          PYTHONUNBUFFERED: "1"
+
+      - name: 上传产物（失败时仍上传）
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: reports-${{ matrix.profile }}-${{ matrix.period }}-${{ github.run_id }}
+          path: output/
+          retention-days: 7
+
+      - name: 上传日志
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: logs-${{ matrix.profile }}-${{ matrix.period }}-${{ github.run_id }}
+          path: logs/
+          retention-days: 3
