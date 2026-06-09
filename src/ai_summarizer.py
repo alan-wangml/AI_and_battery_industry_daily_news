@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-AI 摘要 - 豆包对每个分类的文章进行筛选、压缩摘要
+AI 摘要 - DeepSeek 对每个分类的文章进行筛选、压缩摘要
 （时效性由 Google Alerts 保证，不再做日期校验）
 """
 
@@ -13,9 +13,9 @@ from typing import List, Dict
 
 logger = logging.getLogger(__name__)
 
-DOUBAO_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3/chat/completions"
-DOUBAO_API_KEY  = os.environ.get("DOUBAO_API_KEY", "")
-DOUBAO_MODEL    = os.environ.get("DOUBAO_MODEL", "")
+DEEPSEEK_BASE_URL = "https://api.deepseek.com/chat/completions"
+DEEPSEEK_API_KEY  = os.environ.get("DEEPSEEK_API_KEY", "")
+DEEPSEEK_MODEL    = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
 
 
 def _parse_json(text: str):
@@ -36,10 +36,10 @@ def _parse_json(text: str):
 
 def _chat(messages: list, max_tokens: int = 3000, temperature: float = 0.2) -> str:
     resp = requests.post(
-        DOUBAO_BASE_URL,
-        headers={"Authorization": f"Bearer {DOUBAO_API_KEY}",
+        DEEPSEEK_BASE_URL,
+        headers={"Authorization": f"Bearer {DEEPSEEK_API_KEY}",
                  "Content-Type": "application/json"},
-        json={"model": DOUBAO_MODEL, "messages": messages,
+        json={"model": DEEPSEEK_MODEL, "messages": messages,
               "max_tokens": max_tokens, "temperature": temperature},
         timeout=300,
     )
@@ -130,7 +130,7 @@ def summarize_all(categories: List[Dict], raw_news: Dict[str, List[Dict]],
     for cat in categories:
         cat_id   = cat["id"]
         articles = raw_news.get(cat_id, [])
-        logger.info("豆包处理: [%s] %d 条候选", cat["name"], len(articles))
+        logger.info("DeepSeek 处理: [%s] %d 条候选", cat["name"], len(articles))
         result[cat_id] = summarize_category(cat, articles, date_phrase, min_items, max_items)
 
     return result
