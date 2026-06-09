@@ -69,8 +69,8 @@ def main(profile_name="ai", period_name="daily", dry_run=False, no_fetch=False):
         raw_news = fetch_all(categories, lookback_days=period["lookback_days"],
                              alert_subjects=alert_subjects)
 
-        # Step 2: 豆包筛选摘要
-        logger.info("Step 2/3: 豆包筛选摘要...")
+        # Step 2: DeepSeek 筛选摘要
+        logger.info("Step 2/3: DeepSeek 筛选摘要...")
         summarized = summarize_all(categories, raw_news, period)
 
         with open(cache_file, "w", encoding="utf-8") as f:

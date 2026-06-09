@@ -267,7 +267,7 @@ def generate_html(categories: List[Dict], summarized: Dict[str, List[Dict]],
 {sections}
 </div>
 
-<div class="footer">{_escape(logo_text)} {period['en']} &middot; {date_disp} &middot; Google Alerts + 豆包 AI &middot; 仅供参考</div>
+<div class="footer">{_escape(logo_text)} {period['en']} &middot; {date_disp} &middot; Google Alerts + DeepSeek AI &middot; 仅供参考</div>
 
 <script>
 function toggle(el) {{ el.closest('.news-item').classList.toggle('open'); }}
