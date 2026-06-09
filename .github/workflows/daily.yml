@@ -19,12 +19,7 @@ jobs:
           python-version: '3.11'
 
       - name: 安装依赖
-        run: pip install requests python-dotenv
-        
-      - name: 检查已安装的包
-        run: |
-          echo "=== 已安装的 Python 包 ==="
-          pip list | grep -i "request\|dotenv\|litellm\|openai\|zhipu\|deepseek"
+        run: pip install python-dotenv
 
       - name: 创建 .env 文件
         run: |

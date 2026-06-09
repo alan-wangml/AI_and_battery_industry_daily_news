@@ -7,7 +7,8 @@ AI 摘要 - DeepSeek 对每个分类的文章进行筛选、压缩摘要
 import os
 import json
 import logging
-import requests
+import urllib.request
+import urllib.error
 from datetime import datetime, timedelta
 from typing import List, Dict
 
@@ -47,29 +48,58 @@ def _chat(messages: list, max_tokens: int = 3000, temperature: float = 0.2) -> s
     
     logger.info("=" * 60)
     logger.info("调用 API - 详细信息:")
-    logger.info("  URL: %s", DEEPSEEK_BASE_URL)
+    logger.info("  目标 URL: %s", DEEPSEEK_BASE_URL)
     logger.info("  Model: %s", DEEPSEEK_MODEL)
     logger.info("  API Key 前缀: %s...", DEEPSEEK_API_KEY[:10])
     logger.info("=" * 60)
     
     try:
-        resp = requests.post(
+        # 使用 urllib 而不是 requests，避免任何中间层的干扰
+        import urllib.request
+        import urllib.error
+        
+        headers = {
+            "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+            "Content-Type": "application/json",
+            "User-Agent": "AI-Daily-News/1.0"
+        }
+        
+        payload = json.dumps({
+            "model": DEEPSEEK_MODEL,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature
+        })
+        
+        logger.debug("使用 urllib 发送请求...")
+        logger.debug("  URL: %s", DEEPSEEK_BASE_URL)
+        logger.debug("  Payload model: %s", DEEPSEEK_MODEL)
+        
+        # 创建请求
+        req = urllib.request.Request(
             DEEPSEEK_BASE_URL,
-            headers={"Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-                     "Content-Type": "application/json"},
-            json={"model": DEEPSEEK_MODEL, "messages": messages,
-                  "max_tokens": max_tokens, "temperature": temperature},
-            timeout=300,
+            data=payload.encode('utf-8'),
+            headers=headers,
+            method='POST'
         )
-        resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"].strip()
-    except requests.exceptions.HTTPError as e:
-        logger.error("API 请求失败: %s", e.response.status_code)
-        logger.error("错误响应: %s", e.response.text[:500])
-        logger.error("实际请求 URL: %s", e.response.url)
+        
+        # 发送请求
+        with urllib.request.urlopen(req, timeout=300) as response:
+            result = response.read().decode('utf-8')
+            logger.debug("响应状态: %s", response.status)
+            logger.debug("实际请求 URL: %s", response.url)
+            
+        return json.loads(result)["choices"][0]["message"]["content"].strip()
+        
+    except urllib.error.HTTPError as e:
+        logger.error("❌ API 请求失败: HTTP %s", e.code)
+        logger.error("  请求 URL: %s", e.url if hasattr(e, 'url') else '未知')
+        logger.error("  响应文本: %s", e.read().decode('utf-8')[:500])
         raise
     except Exception as e:
-        logger.error("API 调用异常: %s", str(e))
+        logger.error("❌ API 调用异常: %s", str(e))
+        import traceback
+        logger.error("追踪信息: %s", traceback.format_exc())
         raise
 
 
