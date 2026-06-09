@@ -45,7 +45,13 @@ def _chat(messages: list, max_tokens: int = 3000, temperature: float = 0.2) -> s
     if not DEEPSEEK_API_KEY:
         raise ValueError("DEEPSEEK_API_KEY 未设置，无法调用 API")
     
-    logger.debug("调用 API: %s, Model: %s", DEEPSEEK_BASE_URL, DEEPSEEK_MODEL)
+    logger.info("=" * 60)
+    logger.info("调用 API - 详细信息:")
+    logger.info("  URL: %s", DEEPSEEK_BASE_URL)
+    logger.info("  Model: %s", DEEPSEEK_MODEL)
+    logger.info("  API Key 前缀: %s...", DEEPSEEK_API_KEY[:10])
+    logger.info("=" * 60)
+    
     try:
         resp = requests.post(
             DEEPSEEK_BASE_URL,
@@ -58,7 +64,9 @@ def _chat(messages: list, max_tokens: int = 3000, temperature: float = 0.2) -> s
         resp.raise_for_status()
         return resp.json()["choices"][0]["message"]["content"].strip()
     except requests.exceptions.HTTPError as e:
-        logger.error("API 请求失败: %s - %s", e.response.status_code, e.response.text)
+        logger.error("API 请求失败: %s", e.response.status_code)
+        logger.error("错误响应: %s", e.response.text[:500])
+        logger.error("实际请求 URL: %s", e.response.url)
         raise
     except Exception as e:
         logger.error("API 调用异常: %s", str(e))

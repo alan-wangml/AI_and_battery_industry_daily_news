@@ -45,11 +45,11 @@ jobs:
 
       # ── AI 行业周报 ──
       - name: 运行 AI 行业周报
-        run: python main.py --profile ai --period weekly
+        run: python3 main.py --profile ai --period weekly
 
       # ── 电池行业周报 ──
       - name: 运行电池行业周报
-        run: python main.py --profile battery --period weekly
+        run: python3 main.py --profile battery --period weekly
 
       - name: 上传 HTML 产物
         uses: actions/upload-artifact@v5

@@ -20,6 +20,11 @@ jobs:
 
       - name: 安装依赖
         run: pip install requests python-dotenv
+        
+      - name: 检查已安装的包
+        run: |
+          echo "=== 已安装的 Python 包 ==="
+          pip list | grep -i "request\|dotenv\|litellm\|openai\|zhipu\|deepseek"
 
       - name: 创建 .env 文件
         run: |
@@ -39,17 +44,29 @@ jobs:
           [ -z "${{ secrets.DEEPSEEK_API_KEY }}" ] && echo "❌ 错误：DEEPSEEK_API_KEY 未配置" && exit 1 || echo "✓ DEEPSEEK_API_KEY 已配置"
           [ -z "${{ secrets.DEEPSEEK_MODEL }}" ] && echo "❌ 错误：DEEPSEEK_MODEL 未配置" && exit 1 || echo "✓ DEEPSEEK_MODEL 已配置"
           echo "所有必要的 Secrets 已配置"
+          
+      - name: 验证 .env 文件内容
+        run: |
+          echo "=== .env 文件内容 ==="
+          cat .env | grep -E "DEEPSEEK|GMAIL" || echo "未找到相关配置"
+          echo "=== 环境变量验证 ==="
+          python3 -c "import os; from dotenv import load_dotenv; load_dotenv(); print('DEEPSEEK_API_KEY:', os.environ.get('DEEPSEEK_API_KEY', 'NOT SET')[:10] + '...'); print('DEEPSEEK_MODEL:', os.environ.get('DEEPSEEK_MODEL', 'NOT SET'))"
 
       - name: 创建必要目录
         run: mkdir -p logs cache output
 
+      - name: 测试 DeepSeek API 连接
+        run: python3 test_deepseek.py
+
       # ── AI 行业日报 ──
       - name: 运行 AI 行业日报
-        run: python main.py --profile ai --period daily
+        run: python3 main.py --profile ai --period daily
+        env:
+          PYTHONUNBUFFERED: "1"
 
       # ── 电池行业日报 ──
       - name: 运行电池行业日报
-        run: python main.py --profile battery --period daily
+        run: python3 main.py --profile battery --period daily
 
       - name: 上传 HTML 产物
         uses: actions/upload-artifact@v5
