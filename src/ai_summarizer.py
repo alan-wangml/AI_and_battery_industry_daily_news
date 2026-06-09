@@ -17,6 +17,13 @@ DEEPSEEK_BASE_URL = "https://api.deepseek.com/chat/completions"
 DEEPSEEK_API_KEY  = os.environ.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_MODEL    = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
 
+# 启动时验证配置
+if not DEEPSEEK_API_KEY:
+    logger.warning("⚠️ DEEPSEEK_API_KEY 未设置，将无法调用 AI API")
+if not DEEPSEEK_MODEL:
+    logger.warning("⚠️ DEEPSEEK_MODEL 未设置，将使用默认值: %s", DEEPSEEK_MODEL)
+logger.info("API 配置: URL=%s, Model=%s", DEEPSEEK_BASE_URL, DEEPSEEK_MODEL)
+
 
 def _parse_json(text: str):
     text = text.strip()
@@ -35,16 +42,27 @@ def _parse_json(text: str):
 
 
 def _chat(messages: list, max_tokens: int = 3000, temperature: float = 0.2) -> str:
-    resp = requests.post(
-        DEEPSEEK_BASE_URL,
-        headers={"Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-                 "Content-Type": "application/json"},
-        json={"model": DEEPSEEK_MODEL, "messages": messages,
-              "max_tokens": max_tokens, "temperature": temperature},
-        timeout=300,
-    )
-    resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"].strip()
+    if not DEEPSEEK_API_KEY:
+        raise ValueError("DEEPSEEK_API_KEY 未设置，无法调用 API")
+    
+    logger.debug("调用 API: %s, Model: %s", DEEPSEEK_BASE_URL, DEEPSEEK_MODEL)
+    try:
+        resp = requests.post(
+            DEEPSEEK_BASE_URL,
+            headers={"Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                     "Content-Type": "application/json"},
+            json={"model": DEEPSEEK_MODEL, "messages": messages,
+                  "max_tokens": max_tokens, "temperature": temperature},
+            timeout=300,
+        )
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"].strip()
+    except requests.exceptions.HTTPError as e:
+        logger.error("API 请求失败: %s - %s", e.response.status_code, e.response.text)
+        raise
+    except Exception as e:
+        logger.error("API 调用异常: %s", str(e))
+        raise
 
 
 def summarize_category(cat: Dict, articles: List[Dict], date_phrase: str,

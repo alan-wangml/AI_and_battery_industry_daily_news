@@ -46,7 +46,7 @@ def main(profile_name="ai", period_name="daily", dry_run=False, no_fetch=False):
     profile    = load_profile(profile_name)
     period     = load_period(period_name)
     categories = profile.CATEGORIES
-    title      = f"{profile.REPORT_TITLE}{period['label']}"   # 如「AI 行业日报」/「AI 行业周报」
+    title      = f"{profile.REPORT_TITLE}{period['label']}"   # AI 行业日报 / 周报
     alert_subjects = getattr(profile, "ALERT_SUBJECTS", None)
 
     # 缓存按 profile + period 区分，避免日报/周报互相串数据
