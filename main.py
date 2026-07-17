@@ -89,12 +89,24 @@ def main(profile_name="ai", period_name="daily", dry_run=False, no_fetch=False):
                               report_title=title, profile=profile_name, period=period)
     logger.info("已保存: %s", html_path)
 
-    # 发送邮件
+    # 发送邮件（防重复：同一天同一 profile+period 只发一次）
     if dry_run:
         logger.info("dry-run，跳过邮件发送，HTML 文件在: %s", html_path)
     else:
-        logger.info("发送邮件...")
-        send_report(html_path, report_title=title, period=period)
+        today_str = datetime.now().strftime("%Y%m%d")
+        sentinel_file = Path(f"cache/sent_{profile_name}_{period_name}_{today_str}.json")
+        if sentinel_file.exists():
+            logger.info("今天已发送过 %s-%s，跳过重复发送", profile_name, period_name)
+        else:
+            logger.info("发送邮件...")
+            send_report(html_path, report_title=title, period=period)
+            # 写入哨兵文件，防止同一天重复发送
+            sentinel_file.write_text(json.dumps({
+                "profile": profile_name,
+                "period": period_name,
+                "date": today_str,
+                "sent_at": datetime.now().isoformat(),
+            }, ensure_ascii=False), encoding="utf-8")
 
     logger.info("完成！耗时 %d 秒", (datetime.now() - start).seconds)
 
