@@ -2,8 +2,8 @@ name: 行业日报与周报
 
 on:
   schedule:
-    # 日报：每天北京时间早上11点（UTC 03:00）
-    - cron: '0 3 * * *'
+    # 日报：每天北京时间早上11点（UTC 00:00）
+    - cron: '0 0 * * *'
     # 周报：每周一北京时间早上8点（UTC 周一00:00）
     - cron: '0 0 * * 1'
   workflow_dispatch:
@@ -20,7 +20,7 @@ on:
 jobs:
   daily:
     if: |
-      (github.event_name == 'schedule' && github.event.schedule == '0 3 * * *') ||
+      (github.event_name == 'schedule' && github.event.schedule == '0 0 * * *') ||
       (github.event_name == 'workflow_dispatch' && (github.event.inputs.period == 'daily' || github.event.inputs.period == 'both'))
     runs-on: ubuntu-latest
     strategy:
